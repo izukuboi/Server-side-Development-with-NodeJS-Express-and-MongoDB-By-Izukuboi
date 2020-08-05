@@ -33,6 +33,54 @@ app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+
+function auth(req, res, next){
+  console.log(req.headers);
+
+  var authHeader =req.headers.authorization;
+  //console.log(req.headers.authorization);
+  
+
+  if(!authHeader){
+    var err = new Error('You are no authenticated');
+
+    res.setHeader('WWW-Authenticate', 'Basic');
+    err.status = 401;
+    return next(err);
+  }
+  console.log('lmao');
+  
+  var auth = new Buffer.from(authHeader.split(' ')[1], 'base64').toString();
+  console.log(auth);
+  var auth = auth.split(':');
+  console.log(auth);
+  
+  
+  
+
+  var username = auth[0];
+  //console.log(username);
+  
+  var password = auth[1];
+  //console.log(password);
+  
+
+  if(username == 'admin' && password == 'password'){
+    next();
+  }
+  else {
+    var err = new Error('You are no authenticated');
+
+    res.setHeader('WWW-Authenticate', 'Basic');
+    err.status = 401;
+    return next(err);
+  }
+
+
+}
+
+app.use(auth);
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
