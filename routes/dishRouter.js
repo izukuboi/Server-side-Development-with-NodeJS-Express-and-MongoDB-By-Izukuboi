@@ -21,7 +21,7 @@ dishRouter.route('/')
     }, (err) =>next(err))
     .catch((err)=> next(err));
 })
-.post(authenticate.verifyUser, (req,res,next) =>{
+.post(authenticate.verifyUser, authenticate.verifyAdmin, (req,res,next) =>{
     Dishes.create(req.body)
     .then((dish) =>{
         console.log('Dish Created', dish.toJSON());
@@ -32,11 +32,11 @@ dishRouter.route('/')
     },(err)=> next(err))
     .catch((err)=> next(err));
 })
-.put(authenticate.verifyUser, (req,res,next) =>{
+.put(authenticate.verifyUser, authenticate.verifyAdmin, (req,res,next) =>{
     res.statusCode = 403;
     res.end('PUT operation not suported on /dishes');
 })
-.delete(authenticate.verifyUser, (req,res,next) =>{
+.delete(authenticate.verifyUser, authenticate.verifyAdmin, (req,res,next) =>{
     Dishes.remove({})
     .then((resp)=> {
         res.statusCode = 200;
@@ -57,11 +57,11 @@ dishRouter.route('/:dishId')
     },(err)=> next(err))
     .catch((err)=> next(err));
 })
-.post(authenticate.verifyUser, (req,res,next) =>{
+.post(authenticate.verifyUser, authenticate.verifyAdmin, (req,res,next) =>{
     res.statusCode = 403;
     res.end('PUT operation not suported on /dishes/'+ req.params.dishId);
 })
-.put(authenticate.verifyUser, (req,res,next) =>{
+.put(authenticate.verifyUser, authenticate.verifyAdmin, (req,res,next) =>{
     Dishes.findByIdAndUpdate(req.params.dishId, { //id
         $set: req.body //lo que se tiene que actualizar
     }, {new: true})//devuelve el doc
@@ -73,7 +73,7 @@ dishRouter.route('/:dishId')
     .catch((err)=> next(err));
      //si cuando concluya la operacion, devolvera el valor actualizado si es true.
 })
-.delete(authenticate.verifyUser, (req,res,next) =>{
+.delete(authenticate.verifyUser, authenticate.verifyAdmin, (req,res,next) =>{
     Dishes.findByIdAndRemove(req.params.dishId)
     .then((resp)=> {
         res.statusCode = 200;
@@ -131,7 +131,7 @@ dishRouter.route('/:dishId/comments')
     res.statusCode = 403;
     res.end('PUT operation not suported on /dishes' + req.params.dishId + '/comments');
 })
-.delete(authenticate.verifyUser, (req,res,next) =>{
+.delete(authenticate.verifyUser, authenticate.verifyAdmin, (req,res,next) =>{
     Dishes.findById(req.params.dishId)
     .then((dish)=> {
         if (dish != null){
@@ -192,8 +192,11 @@ dishRouter.route('/:dishId/comments/:commentId')
 })
 .put(authenticate.verifyUser, (req,res,next) =>{
     Dishes.findById(req.params.dishId) // busco el plato
-    .then((dish) =>{// promesa que devuelve plato despues de buscarlo
-        if (dish != null && dish.comments.id(req.params.commentId) != null) {// verifico si el plato y el cometario existe
+    .then((dish) =>{
+        var comment = dish.comments.id(req.params.commentId);
+        //if (req.user._id === dish.comments.author._id){
+            // promesa que devuelve plato despues de buscarlo
+        if (dish != null && comment != null && req.user._id.equals(comment.author._id) ){// verifico si el plato, el cometario existe y si son los mismos usuarios
             if (req.body.rating) {//verifico si existe el rating
                 dish.comments.id(req.params.commentId).rating =  req.body.rating;//modifico el raing con el request dado
                 
@@ -213,14 +216,19 @@ dishRouter.route('/:dishId/comments/:commentId')
 
             }, (err) => next(err));
         }
-        else if(dishh == null) {//si no existe el plato
+        else if(dish == null) {//si no existe el plato
             err = new Error('Dish' + req.params.dishId + ' not found');
             err.status = 404;
             return next(err)
         }
-        else {//si no existe el comentario
+        else if(comment == null) {//si no existe el comentario
             err = new Error('Comment' + req.params.commentId + ' not found');
             err.status = 404;
+            return next(err)
+        }
+        else if (!req.user._id.equals(comment.author._id)){
+            err = new Error('You are not authorized to perform this operation!');
+            err.status = 403;
             return next(err)
         }
     },(err)=> next(err))
@@ -229,7 +237,8 @@ dishRouter.route('/:dishId/comments/:commentId')
 .delete(authenticate.verifyUser, (req,res,next) =>{
     Dishes.findById(req.params.dishId) // busco el plato
     .then((dish) =>{// promesa que devuelve plato despues de buscarlo
-        if (dish != null && dish.comments.id(req.params.commentId) != null) {// verifico si el plato y el cometario existe
+        var comment = dish.comments.id(req.params.commentId);
+        if (dish != null && comment != null && req.user._id.equals(comment.author._id) ) {// verifico si el plato y el cometario existe
             dish.comments.id(req.params.commentId).remove();//elimino el comentario
             dish.save()//guardo los cambios
             .then((dish) => {//promesa que devuelve el plato guardado
@@ -248,9 +257,14 @@ dishRouter.route('/:dishId/comments/:commentId')
             err.status = 404;
             return next(err)
         }
-        else {//si no existe el comentario
+        else if(comment == null) {//si no existe el comentario
             err = new Error('Comment' + req.params.commentId + ' not found');
             err.status = 404;
+            return next(err)
+        }
+        else if (!req.user._id.equals(comment.author._id)){
+            err = new Error('You are not authorized to perform this operation!');
+            err.status = 403;
             return next(err)
         }
     },(err)=> next(err))

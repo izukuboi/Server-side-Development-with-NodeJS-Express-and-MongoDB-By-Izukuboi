@@ -3,12 +3,19 @@ const bodyParser = require('body-parser');
 var User = require('../models/user');
 var passport = require('passport');
 var authenticate = require('../authenticate')
+const mongoose = require('mongoose');
 
 var router = express.Router();
 router.use(bodyParser.json());
 /* GET users listing. */
-router.get('/', function(req, res, next) {
-  res.send('respond with a resource');
+router.get('/',authenticate.verifyUser, authenticate.verifyAdmin,  (req, res, next) =>{
+  User.find({})
+  .then((users)=>{
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'appliaction/json');
+    res.json(users);
+  }, (err) =>next(err))
+  .catch((err) =>next(err));
 });
 
 router.post('/signup', (req, res, next) => {
